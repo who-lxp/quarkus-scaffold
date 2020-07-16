@@ -112,7 +112,7 @@ pipeline {
             }
             steps {
                 script {
-                    env.VERSION = sh(returnStdout: true, script: "mvn help:evaluate -Dexpression=project.version -q -DforceStdout").trim()
+                    env.VERSION = sh(returnStdout: true, script: "mvn help:evaluate -Dexpression=project.version -q -DforceStdout -s settings.xml").trim()
                     env.PACKAGE = "${APP_NAME}-${VERSION}.tar.gz"
                 }
                 sh 'printenv'
