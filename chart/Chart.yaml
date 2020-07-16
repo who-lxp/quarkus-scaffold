@@ -1,12 +1,12 @@
 apiVersion: v2
-name: learning-experience-platform
+name: quarkus-scaffold
 description: A Helm chart to deploy the frontend of the Pet Battle
 type: application
 # HelmChart Version
-version: 1.0.1
+version: 1.0.0
 # This is the version number of the application being deployed. This version number should be
 # incremented each time you make changes to the application.
-appVersion: 1.0.1
-home: https://springdo.github.io/learning-experience-platform
+appVersion: 1.0.0
+home: https://springdo.github.io/quarkus-scaffold
 maintainers:
   - name: springdo
