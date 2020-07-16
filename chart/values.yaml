@@ -1,0 +1,14 @@
+app_name: learning-experience-platform
+replicas: 2
+
+# Docker deets
+image_repository: quay.io
+image_name: learning-experience-platform
+image_namespace: springdo
+# likely over written by the Argo definition
+app_tag: latest
+
+# OCP route
+route: true
+# custom end point injected by config map. This is likely to changed
+config_map: "'http://learning-experience-platform-api-staging.apps.s44.core.rht-labs.com'"
