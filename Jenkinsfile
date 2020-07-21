@@ -5,13 +5,13 @@ pipeline {
 
     environment {
         // GLobal Vars
-        NAME = "learning-experience-platform"
+        NAME = "quarkus-scaffold"
 
         // Config repo managed by ArgoCD details
         ARGOCD_CONFIG_REPO = "github.com/who-lxp/lxp-config.git"
         ARGOCD_CONFIG_REPO_PATH = "lxp-deployment/values-test.yaml"
         ARGOCD_CONFIG_REPO_BRANCH = "master"
-        
+
         // Job name contains the branch eg ds-app-feature%2Fjenkins-123
         JOB_NAME = "${JOB_NAME}".replace("%2F", "-").replace("/", "-")
         GIT_SSL_NO_VERIFY = true
@@ -54,7 +54,7 @@ pipeline {
                             env.TARGET_NAMESPACE = "who-lxp"
                             // External image push registry info
                             env.IMAGE_REPOSITORY = "quay.io"
-                            // app name for master is just learning-experience-platform or something
+                            // app name for master is just quarkus-scaffold or something
                             env.APP_NAME = "${NAME}".replace("/", "-").toLowerCase()
                         }
                     }
@@ -78,7 +78,6 @@ pipeline {
                             env.IMAGE_REPOSITORY = 'image-registry.openshift-image-registry.svc:5000'
                             // ammend the name to create 'sandbox' deploys based on current branch
                             env.APP_NAME = "${GIT_BRANCH}-${NAME}".replace("/", "-").toLowerCase()
-                            env.NODE_ENV = "test"
                         }
                     }
                 }
@@ -88,51 +87,41 @@ pipeline {
         stage("Build (Compile App)") {
             agent {
                 node {
-                    label "jenkins-slave-npm"
+                    label "jenkins-slave-mvn"
                 }
             }
             steps {
                 script {
-                    env.VERSION = sh(returnStdout: true, script: "npm run version --silent").trim()
+                    env.VERSION = sh(returnStdout: true, script: "mvn help:evaluate -Dexpression=project.version -q -DforceStdout -s settings.xml").trim()
                     env.PACKAGE = "${APP_NAME}-${VERSION}.tar.gz"
                 }
                 sh 'printenv'
 
-                echo '### Install deps ###'
-                // sh 'npm install'
-                sh 'npm  --registry http://${SONATYPE_NEXUS_SERVICE_SERVICE_HOST}:${SONATYPE_NEXUS_SERVICE_SERVICE_PORT}/repository/labs-npm ci'
+                echo '### Java: lint, build, test, package ###'
 
-                echo '### Running linter ###'
-                sh 'npm run lint'
-
-                echo '### Running tests ###'
-                sh 'npm run test:ci'
-
-                echo '### Running build ###'
-                sh '''
-                    npm run build
-                '''
+                sh './mvnw clean deploy -s settings.xml'
 
                 echo '### Packaging App for Nexus ###'
                 sh '''
-                    tar -zcvf ${PACKAGE} dist Dockerfile nginx.conf
-                    curl -v -f -u ${NEXUS_CREDS} --upload-file ${PACKAGE} http://${SONATYPE_NEXUS_SERVICE_SERVICE_HOST}:${SONATYPE_NEXUS_SERVICE_SERVICE_PORT}/repository/${NEXUS_REPO_NAME}/${APP_NAME}/${PACKAGE}
+                    mv Dockerfile.jvm Dockerfile
+                    tar -zcvf ${PACKAGE} Dockerfile target/lib target/*-runner.jar
+                    curl -vvv -u ${NEXUS_CREDS} --upload-file ${PACKAGE} http://${SONATYPE_NEXUS_SERVICE_SERVICE_HOST}:${SONATYPE_NEXUS_SERVICE_SERVICE_PORT}/repository/${NEXUS_REPO_NAME}/${APP_NAME}/${PACKAGE}
                 '''
             }
             // Post can be used both on individual stages and for the entire build.
             post {
                 always {
                     // archiveArtifacts "**"
-                    junit 'reports/unit/junit.xml'
-                    // publish html
-                    publishHTML target: [
-                        allowMissing: false,
-                        alwaysLinkToLastBuild: false,
-                        keepAll: true,
-                        reportDir: 'reports/coverage/lcov-report',
-                        reportFiles: 'index.html',
-                        reportName: 'FE Code Coverage'
-                    ]
+                    junit 'target/surefire-reports/*.xml'
+                    // // publish html TODO
+                    // publishHTML target: [
+                    //     allowMissing: false,
+                    //     alwaysLinkToLastBuild: false,
+                    //     keepAll: true,
+                    //     reportDir: 'reports/coverage/lcov-report',
+                    //     reportFiles: 'index.html',
+                    //     reportName: 'FE Code Coverage'
+                    // ]
                 }
             }
         }
@@ -178,7 +167,7 @@ pipeline {
                 }
             }
             steps {
-                sh 'printenv'  
+                sh 'printenv'
                 sh '''
                     helm lint chart
                 '''
@@ -187,13 +176,13 @@ pipeline {
                     yq w -i chart/Chart.yaml 'appVersion' ${VERSION}
                     yq w -i chart/Chart.yaml 'version' ${VERSION}
 
-                    yq w -i chart/Chart.yaml 'name' ${APP_NAME} # APP= feature-123-learning-experience-platform
-                    
+                    yq w -i chart/Chart.yaml 'name' ${APP_NAME} # APP= feature-123-quarkus-scaffold
+
                     # probs point to the image inside ocp cluster or perhaps an external repo?
                     yq w -i chart/values.yaml 'image_repository' ${IMAGE_REPOSITORY}
                     yq w -i chart/values.yaml 'image_name' ${APP_NAME}
                     yq w -i chart/values.yaml 'image_namespace' ${TARGET_NAMESPACE}
-                    
+
                     # latest built image
                     yq w -i chart/values.yaml 'app_tag' ${VERSION}
                 '''
@@ -263,11 +252,11 @@ pipeline {
                 }
             }
         }
-        
+
         stage("Trigger System Tests") {
             options {
                 skipDefaultCheckout(true)
-            }            
+            }
             agent {
                 node {
                     label "master"
@@ -278,7 +267,7 @@ pipeline {
             }
             steps {
                 sh  '''
-                    echo "TODO - Run tests"               
+                    echo "TODO - Run tests"
                 '''
                 build job: 'system-tests/master', parameters: [[$class: 'StringParameterValue', name: 'APP_NAME', value: "${APP_NAME}" ],[$class: 'StringParameterValue', name: 'VERSION', value: "${VERSION}"]], wait: false
             }
