@@ -73,32 +73,12 @@ pipeline {
                     }
                     steps {
                         script {
-                            env.TARGET_NAMESPACE = "ds-dev"
+                            env.TARGET_NAMESPACE = "labs-dev"
                             // Sandbox registry deets
                             env.IMAGE_REPOSITORY = 'image-registry.openshift-image-registry.svc:5000'
                             // ammend the name to create 'sandbox' deploys based on current branch
                             env.APP_NAME = "${GIT_BRANCH}-${NAME}".replace("/", "-").toLowerCase()
                             env.NODE_ENV = "test"
-                        }
-                    }
-                }
-                stage("Pull Request Build") {
-                    options {
-                        skipDefaultCheckout(true)
-                    }
-                    agent {
-                        node {
-                            label "master"
-                        }
-                    }
-                    when {
-                        expression { GIT_BRANCH.startsWith("PR-") }
-                    }
-                    steps {
-                        script {
-                            env.TARGET_NAMESPACE = "ds-dev"
-                            env.IMAGE_REPOSITORY = 'image-registry.openshift-image-registry.svc:5000'
-                            env.APP_NAME = "${GIT_BRANCH}-${NAME}".replace("/", "-").toLowerCase()
                         }
                     }
                 }
